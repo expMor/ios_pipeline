@@ -1,0 +1,53 @@
+version: 2
+jobs:
+  build:
+
+    # Specify the Xcode version to use
+    macos:
+      xcode: "9.0"
+    environment:
+      # Customize the JVM maximum heap limit
+      MAVEN_OPTS: -Xmx3200m
+    
+    steps:
+      - checkout
+   
+      # Build the app and run tests
+      - run: xcodebuild -target ExperiBank -configuration Debug -destination 'platform=iOS,OS=11.0' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+      - run: chmod -R +x ./scripts
+      - run: "./scripts/output.sh 'Application Built Successfully...'"
+      - run: "./scripts/output.sh 'Preparing The Application for Upload...'"
+      - run: "./scripts/zip-app.sh ExperiBank.app ExperiBank"
+      - run: "./scripts/output.sh 'Uploading The Application...'"
+      - run: "./scripts/upload-app.sh"
+      - run: "./scripts/output.sh 'Successfully Uploaded The Application...'"
+      - run: "./scripts/output.sh 'Running Tests...'"
+  test:
+    working_directory: ~/code
+    docker:
+        - image: circleci/openjdk:8-jdk
+    environment:
+        MAVEN_OPTS: -Xmx3200m
+        JVM_OPTS: -Xmx3200m
+    steps:
+        - checkout
+        - restore_cache:
+            keys:
+            - v1-dependencies-{{ checksum "pom.xml" }}
+            - v1-dependencies-
+        - run: mvn dependency:go-offline
+
+        - save_cache:
+            paths:
+                - ~/.m2
+            key: v1-dependencies-{{ checksum "pom.xml" }}
+    
+        - run: mvn clean test
+workflows:
+    version: 2
+    build_and_test:
+        jobs:
+            - build
+            - test:
+                requires:
+                    - build     
